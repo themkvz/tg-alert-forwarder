@@ -5,22 +5,14 @@ const { isTargetCity, detectAlertStatus } = require('./utils');
 const input = require("input");
 // const QRCode = require('qrcode')
 require('dotenv').config()
+const config = require('./config')
 
 const {
     API_ID,
     API_HASH,
     TG_PASS,
-    TG_PHONE,
-    POSTED_CHANNEL,
-    WATCHED_CHANNEL,
-    CITY_REGEX,
-    ALERT_REGEX,
-    CLEAR_REGEX,
-    ALERT_MSG,
-    CLEAR_MSG
+    TG_PHONE
 } = process.env;
-
-const watchedChannels = WATCHED_CHANNEL.split(" ");
 
 const storeSession = new StoreSession("session");
 const client = new TelegramClient(
@@ -64,39 +56,41 @@ const client = new TelegramClient(
     console.log('Connected!');
 
     // Subscribe to channels
-    watchedChannels.forEach(async channel => {
+    config.sourceChannels.forEach(async channel => {
         await client.invoke(new Api.channels.JoinChannel({
             channel,
         }));
     })
 
-    async function postMessage(filePath, msg, originalText) {
-        await client.sendMessage(POSTED_CHANNEL, {
-            file: filePath
+    async function postMessage(file, msg, originalText) {
+        await client.sendMessage(config.targetChannel, {
+            file
         });
 
-        await client.sendMessage(POSTED_CHANNEL, {
-            message: `${msg}\n\n${originalText}`,
+        await client.sendMessage(config.targetChannel, {
+            message: config.showOriginalMsg 
+                ? `${msg}\n\n${originalText}`
+                : msg,
         });
     }
 
     async function eventPrint(event) {
         const message = event.message;
 
-        if (!isTargetCity(message.text, CITY_REGEX)) {
+        if (!isTargetCity(message.text, config.cityRegex)) {
             return
         }
 
         console.log('It\'s target city');
 
-        const alertStatus = detectAlertStatus(message.text, ALERT_REGEX, CLEAR_REGEX);
+        const alertStatus = detectAlertStatus(message.text, config.alertRegex, config.clearRegex);
 
         switch (alertStatus) {
             case 'alert':
-                postMessage('./media/alert.jpg', ALERT_MSG, message.text);
+                postMessage(config.alertMedia, config.alertMsg, message.text);
                 break;
             case 'clear':
-                postMessage('./media/clear.jpg', CLEAR_MSG, message.text);
+                postMessage(config.clearMedia, config.clearMsg, message.text);
                 break;
             default:
                 break;
@@ -106,7 +100,7 @@ const client = new TelegramClient(
     // Add listener
     client.addEventHandler(
         eventPrint, new NewMessage({
-            chats: watchedChannels
+            chats: config.sourceChannels
         })
     );
 })()
