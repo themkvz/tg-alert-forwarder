@@ -3,7 +3,6 @@ const { StoreSession } = require("telegram/sessions");
 const { NewMessage } = require('telegram/events');
 const { isTargetCity, detectAlertStatus } = require('./utils');
 const input = require("input");
-// const QRCode = require('qrcode')
 require('dotenv').config()
 const config = require('./config')
 
@@ -16,7 +15,9 @@ const {
 
 const storeSession = new StoreSession("session");
 const client = new TelegramClient(
-    storeSession, +API_ID, API_HASH, {}
+    storeSession, +API_ID, API_HASH, {
+        connectionRetries: 5,
+    }
 );
 
 (async () => {
@@ -30,28 +31,6 @@ const client = new TelegramClient(
         phoneCode: async () => await input.text("Code ?"),
         onError: (err) => console.log(err),
     });
-
-    // Need fixed
-    // if (!await client.isUserAuthorized()) {
-    //     const user = await client.signInUserWithQrCode({ apiId: +API_ID, apiHash: API_HASH },
-    //         {
-    //             onError: async p1 => {
-    //                 console.log("error", p1);
-    //                 // true = stop the authentication processes
-    //                 return true;
-    //             },
-    //             qrCode: async (code) => {
-    //                 const qrString = `tg://login?token=${code.token.toString("base64url")}`
-    //                 console.log(qrString);
-
-    //                 QRCode.toString(qrString,{type:'terminal'}, (_, qr) => {
-    //                     console.log(qr)
-    //                 });
-    //             },
-    //             password: async () => TG_PASS
-    //         }
-    //     );
-    // }
 
     console.log('Connected!');
 
