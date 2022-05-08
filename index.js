@@ -1,47 +1,37 @@
 const { Api, TelegramClient } = require("telegram");
 const { StoreSession } = require("telegram/sessions");
 const { NewMessage } = require('telegram/events');
-const { isTargetCity, detectAlertStatus } = require('./utils');
-const QRCode = require('qrcode')
+const input = require('input');
 require('dotenv').config()
+const { isTargetCity, detectAlertStatus } = require('./utils');
 const config = require('./config')
 
 const {
     API_ID,
     API_HASH,
     TG_PASS,
+    TG_PHONE
 } = process.env;
 
 const storeSession = new StoreSession("session");
 const client = new TelegramClient(
-    storeSession, +API_ID, API_HASH, {
-        connectionRetries: 5,
-    }
+    storeSession,
+    +API_ID,
+    API_HASH,
+    { connectionRetries: 5 }
 );
 
 (async () => {
     // Connect
     await client.connect();
 
-    if (!await client.isUserAuthorized()) {
-        await client.signInUserWithQrCode({ apiId: +API_ID, apiHash: API_HASH },
-            {
-                onError: async p1 => {
-                    console.log("error", p1);
-                    // true = stop the authentication processes
-                    return true;
-                },
-                qrCode: async (code) => {
-                    const qrString = `tg://login?token=${code.token.toString("base64url")}`
-
-                    QRCode.toString(qrString,{type:'terminal'}, (_, qr) => {
-                        console.log(qr)
-                    });
-                },
-                password: async () => TG_PASS
-            }
-        );
-    }
+    // Auth
+    await client.start({
+        phoneNumber: async () => TG_PHONE,
+        password: async () => TG_PASS,
+        phoneCode: async () => await input.text("Code ?"),
+        onError: (err) => console.log(err),
+    });
 
     console.log('Connected!');
 
@@ -53,15 +43,17 @@ const client = new TelegramClient(
     })
 
     async function postMessage(file, msg, originalText) {
-        await client.sendMessage(config.targetChannel, {
-            file
-        });
-
-        await client.sendMessage(config.targetChannel, {
-            message: config.showOriginalMsg 
-                ? `${msg}\n\n${originalText}`
-                : msg,
-        });
+        config.targetChannels.forEach(async target => {
+            await client.sendMessage(target, {
+                file
+            });
+    
+            await client.sendMessage(target, {
+                message: config.showOriginalMsg
+                    ? `${msg}\n\n${originalText}`
+                    : msg,
+            });
+        })
     }
 
     async function eventPrint(event) {
